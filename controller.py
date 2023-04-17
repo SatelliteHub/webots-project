@@ -3,14 +3,14 @@ import math
 import csv
 import numpy as np
 
-filename = 'OccupancyGrid.csv'
+filename = '../../OccupancyGrid.csv'
 delimiter = ','
 occupancy_grid = np.genfromtxt(filename, delimiter=delimiter, dtype=str)
 occupancy_grid[occupancy_grid == ''] = '0'
 occupancy_grid = np.char.strip(occupancy_grid, "'")
 print(occupancy_grid)
 
-CELL_SIZE = 0.1  # meters
+CELL_SIZE = 0.1
 
 
 TIME_STEP = 64
@@ -32,7 +32,7 @@ for i in range(4):
 
 
 def getGpsData():
-    gp = robot.getDevice("global")
+    gp = robot.getDevice("gps1")
     gp.enable(TIME_STEP)
     gpsData = gp.getValues()
     print("X:", gpsData[0])
@@ -40,22 +40,15 @@ def getGpsData():
     print("Z:", gpsData[2])
     return gpsData
     
-def getRobotPose(leftSpeed, rightSpeed):
+def getRobotPose():
     global x, y, theta
     gpsData = getGpsData()
+    
+    x_gps = gpsData[0]
+    y_gps = gpsData[1]
 
-    # ##Convert GPS coordinates to meters
-    x_gps = gpsData[0] / CELL_SIZE
-    y_gps = gpsData[2] / CELL_SIZE
-
-    #Update the robot's position based on its movement
-    delta_distance = (leftSpeed + rightSpeed) / 2.0 * TIME_STEP / 1000.0
-    delta_theta = (leftSpeed - rightSpeed) / 0.102  # 0.102 is the distance between the wheels
-    x += delta_distance * math.sin(theta + delta_theta / 2.0)
-    y += delta_distance * math.cos(theta + delta_theta / 2.0)
-    theta += delta_theta
-
-    return (x, y, theta)
+    print("x_gps: " + str(x_gps) + ", y_gps: " + str(y_gps))
+    return (x_gps, y_gps)
     
 def heuristic_cost_estimate(start, goal):
     return math.sqrt((start[0] - goal[0]) ** 2 + (start[1] - goal[1]) ** 2)
@@ -121,15 +114,17 @@ def control_robot_along_path(robot_location, path):
         return 0.0, 0.0
 
     next_point = path[1]
+
     next_point_world = (
-        (next_point[1] - occupancy_grid.shape[1] // 2) * CELL_SIZE,
-        (next_point[0] - occupancy_grid.shape[0] // 2) * CELL_SIZE,
+        (next_point[1] * CELL_SIZE),
+        (next_point[0] * CELL_SIZE),
     )
 
     angle_to_next_point = math.atan2(
         next_point_world[0] - robot_location[0], next_point_world[1] - robot_location[1]
     )
-    angle_diff = angle_to_next_point - robot_location[2]
+
+    angle_diff = angle_to_next_point - theta
 
     # Ensure the angle difference is within the range of -pi to pi
     while angle_diff > math.pi:
@@ -137,7 +132,7 @@ def control_robot_along_path(robot_location, path):
     while angle_diff < -math.pi:
         angle_diff += 2 * math.pi
 
-    angular_speed = angle_diff * 0.5
+    angular_speed = angle_diff * 10
     linear_speed = 1.0
 
     left_speed = linear_speed - angular_speed * 0.102 / 2
@@ -149,7 +144,9 @@ def control_robot_along_path(robot_location, path):
 
 # Convert the goal coordinates (3, -4) to array indices
 goal_x, goal_y = 3, -4
-goal_index = (goal_y + occupancy_grid.shape[0] // 2, goal_x + occupancy_grid.shape[1] // 2)
+# goal_index = (goal_y + occupancy_grid.shape[0] // 2, goal_x + occupancy_grid.shape[1] // 2)
+goal_index = (goal_y / CELL_SIZE*-1, goal_x /CELL_SIZE)
+
 
 # Find the path using the A* algorithm
 while robot.step(TIME_STEP) != -1:
@@ -158,16 +155,20 @@ while robot.step(TIME_STEP) != -1:
     y = 0.0
     theta = 0.0
 
-    # Initialize leftSpeed and rightSpeed before calling getRobotPose()
-    leftSpeed = 1.0
-    rightSpeed = 1.0
+    robot_location = getRobotPose()
 
-    robot_location = getRobotPose(leftSpeed, rightSpeed)
+    print("robot location: ", end='')
+    print(robot_location)
+    
+    # robot_location_index = (
+    #     int(round((robot_location[1] + occupancy_grid.shape[0] // 2) * CELL_SIZE)),
+    #     int(round((robot_location[0] + occupancy_grid.shape[1] // 2) * CELL_SIZE)),
+    # )
 
-    robot_location_index = (
-        int(round((robot_location[1] + occupancy_grid.shape[0] // 2) * CELL_SIZE)),
-        int(round((robot_location[0] + occupancy_grid.shape[1] // 2) * CELL_SIZE)),
-    )
+    robot_location_index = [int(robot_location[1]/CELL_SIZE*-1), int(robot_location[0]/CELL_SIZE)]
+
+    print("robot loc index: ", end='')
+    print(robot_location_index)
 
     path = a_star(robot_location_index, goal_index, occupancy_grid)
 
