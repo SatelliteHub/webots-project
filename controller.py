@@ -126,7 +126,7 @@ def control_robot_along_path(robot_location, path):
 
     angle_diff = angle_to_next_point - theta
 
-    # Ensure the angle difference is within the range of -pi to pi
+    # Make sure that the angle difference is within the range of -pi to pi
     while angle_diff > math.pi:
         angle_diff -= 2 * math.pi
     while angle_diff < -math.pi:
@@ -135,13 +135,17 @@ def control_robot_along_path(robot_location, path):
     angular_speed = angle_diff * 10
     linear_speed = 1.0
 
-    left_speed = linear_speed - angular_speed * 0.102 / 2
-    right_speed = linear_speed + angular_speed * 0.102 / 2
+    wheelbase = 0.11 # Distance between centre of Right and Left Wheels
+    half_wheelbase = wheelbase / 2
+
+    left_speed = linear_speed - angular_speed * half_wheelbase
+    right_speed = linear_speed + angular_speed * half_wheelbase
 
     return left_speed, right_speed
 
 
 
+x
 # Convert the goal coordinates (3, -4) to array indices
 goal_x, goal_y = 3, -4
 # goal_index = (goal_y + occupancy_grid.shape[0] // 2, goal_x + occupancy_grid.shape[1] // 2)
